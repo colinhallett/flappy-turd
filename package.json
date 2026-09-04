@@ -1,0 +1,12 @@
+{
+  "name": "flappy-turd",
+  "version": "1.0.0",
+  "description": "Flappy Bird parody featuring Flappy Turd with a blond wig",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve ."
+  },
+  "keywords": ["flappy-bird", "game", "canvas", "javascript", "arcade"],
+  "author": "Colin Hallett",
+  "license": "MIT"
+}

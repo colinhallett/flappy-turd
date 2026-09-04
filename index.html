@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Flappy Turd - The Most Tremendous Game Ever</title>
+  <meta name="description" content="Guide Flappy Turd with the golden comb-over wig through the golden obstacles! Huge score, tremendous physics!">
+  
+  <!-- Open Graph -->
+  <meta property="og:title" content="Flappy Turd">
+  <meta property="og:description" content="Flappy Turd with a golden comb-over! The most tremendous game in history!">
+  <meta property="og:type" content="website">
+
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💩</text></svg>">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Fredoka:wght@600;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="game-wrapper">
+    <div id="canvas-container">
+      <canvas id="gameCanvas" width="400" height="600"></canvas>
+      
+      <!-- Top Bar / HUD -->
+      <div id="hud" class="hud-layer hidden">
+        <div id="score-display">0</div>
+      </div>
+
+      <!-- Start Screen Overlay -->
+      <div id="start-screen" class="overlay-screen">
+        <div class="logo-container">
+          <h1 class="game-title">
+            <span class="title-flappy">FLAPPY</span>
+            <span class="title-turd">TURD</span>
+          </h1>
+          <p class="subtitle">"Nobody flaps better than me. Believe me!"</p>
+        </div>
+
+        <div class="character-preview-card">
+          <canvas id="previewCanvas" width="120" height="110"></canvas>
+          <div class="preview-badge">100% PURE GOLDEN HAIR</div>
+        </div>
+
+        <button id="btn-start" class="btn-retro btn-primary">
+          <span>TAP OR PRESS SPACE TO PLAY</span>
+        </button>
+
+        <div class="controls-hint">
+          <span class="key-icon">SPACE</span> or <span class="key-icon">CLICK / TAP</span> to Flap
+        </div>
+
+        <div class="high-score-tag">
+          BEST SCORE: <span id="start-high-score">0</span>
+        </div>
+      </div>
+
+      <!-- Game Over Screen Overlay -->
+      <div id="gameover-screen" class="overlay-screen hidden">
+        <div class="quote-bubble" id="death-quote">
+          "TOTAL RIGGED HOAX! THE PIPES WERE CROOKED!"
+        </div>
+
+        <h2 class="gameover-title">GAME OVER</h2>
+
+        <div class="score-card">
+          <div class="score-card-row">
+            <span class="label">SCORE:</span>
+            <span class="val" id="final-score">0</span>
+          </div>
+          <div class="score-card-row">
+            <span class="label">BEST:</span>
+            <span class="val" id="final-best-score">0</span>
+          </div>
+          <div class="medal-row">
+            <span class="label">MEDAL:</span>
+            <span id="medal-display" class="medal-badge">NONE</span>
+          </div>
+        </div>
+
+        <div class="gameover-buttons">
+          <button id="btn-restart" class="btn-retro btn-primary">
+            <span>PLAY AGAIN</span>
+          </button>
+          <button id="btn-share" class="btn-retro btn-secondary">
+            <span>SHARE SCORE 📢</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Quote Notification Toast -->
+      <div id="toast-banner" class="toast-banner hidden">
+        <span id="toast-text">TREMENDOUS!</span>
+      </div>
+
+      <!-- Audio Mute Toggle Button -->
+      <button id="btn-audio" class="btn-icon" title="Toggle Sound">
+        <span id="audio-icon">🔊</span>
+      </button>
+    </div>
+  </div>
+
+  <script src="src/audio.js"></script>
+  <script src="src/sprites.js"></script>
+  <script src="src/game.js"></script>
+</body>
+</html>
