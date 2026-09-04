@@ -417,17 +417,39 @@
     requestAnimationFrame(gameLoop);
   }
 
-  // Event Listeners
+  // Event Listeners & Mobile Touch Support
+  function onUserInteraction(e) {
+    if (e) {
+      if (e.target && (e.target.closest('button') || e.target.closest('#btn-audio') || e.target.closest('#btn-share'))) {
+        return; // Let the button handle its own click
+      }
+      if (e.cancelable && e.type !== 'pointerdown') {
+        e.preventDefault();
+      }
+    }
+    window.soundCtrl.init();
+    window.soundCtrl.resume();
+    handleAction();
+  }
+
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
       e.preventDefault();
+      window.soundCtrl.init();
+      window.soundCtrl.resume();
       handleAction();
     }
   });
 
-  canvas.addEventListener('pointerdown', (e) => {
+  // Tap anywhere on canvas container or screen to flap
+  const canvasContainer = document.getElementById('canvas-container');
+  canvasContainer.addEventListener('pointerdown', onUserInteraction, { passive: false });
+
+  // Start screen tap anywhere to start
+  startScreen.addEventListener('pointerdown', (e) => {
+    if (e.target && e.target.closest('#btn-audio')) return;
     e.preventDefault();
-    handleAction();
+    startGame();
   });
 
   btnStart.addEventListener('click', (e) => {
@@ -454,6 +476,10 @@
         showToast("COPIED TO CLIPBOARD!");
       });
     }
+  });
+
+  btnAudio.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
   });
 
   btnAudio.addEventListener('click', (e) => {
