@@ -4,35 +4,58 @@ class SoundController {
   constructor() {
     this.ctx = null;
     this.isMuted = false;
-    this.initialized = false;
+    this.unlocked = false;
     
     // Music Engine state
     this.isPlayingMusic = false;
     this.musicTimer = null;
     this.step = 0;
-    this.tempo = 140; // BPM
+    this.tempo = 145; // Energetic arcade BPM
     this.masterMusicGain = null;
     this.masterSfxGain = null;
   }
 
+  // Robust AudioContext initialization with iOS / Mobile unlocking
   init() {
-    if (this.initialized) return;
-    try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      this.ctx = new AudioContext();
-      
-      // Master Gains
-      this.masterMusicGain = this.ctx.createGain();
-      this.masterMusicGain.gain.setValueAtTime(this.isMuted ? 0 : 0.18, this.ctx.currentTime);
-      this.masterMusicGain.connect(this.ctx.destination);
+    if (!this.ctx) {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AudioContext();
+        
+        // Master Music Gain
+        this.masterMusicGain = this.ctx.createGain();
+        this.masterMusicGain.gain.value = this.isMuted ? 0 : 0.4;
+        this.masterMusicGain.connect(this.ctx.destination);
 
-      this.masterSfxGain = this.ctx.createGain();
-      this.masterSfxGain.gain.setValueAtTime(this.isMuted ? 0 : 0.45, this.ctx.currentTime);
-      this.masterSfxGain.connect(this.ctx.destination);
+        // Master SFX Gain
+        this.masterSfxGain = this.ctx.createGain();
+        this.masterSfxGain.gain.value = this.isMuted ? 0 : 0.7;
+        this.masterSfxGain.connect(this.ctx.destination);
+      } catch (e) {
+        console.warn("Web Audio API not supported", e);
+      }
+    }
 
-      this.initialized = true;
-    } catch (e) {
-      console.warn("Web Audio API not supported", e);
+    this.unlockAudio();
+  }
+
+  unlockAudio() {
+    if (!this.ctx) return;
+    
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+
+    if (!this.unlocked) {
+      // Play 1-frame silent buffer to force unlock iOS Safari / WebKit audio hardware
+      try {
+        const buffer = this.ctx.createBuffer(1, 1, 22050);
+        const source = this.ctx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(this.ctx.destination);
+        source.start(0);
+        this.unlocked = true;
+      } catch (e) {}
     }
   }
 
@@ -43,14 +66,14 @@ class SoundController {
   }
 
   toggleMute() {
+    this.init();
     this.isMuted = !this.isMuted;
     if (this.ctx) {
-      const now = this.ctx.currentTime;
       if (this.masterMusicGain) {
-        this.masterMusicGain.gain.setValueAtTime(this.isMuted ? 0 : 0.18, now);
+        this.masterMusicGain.gain.value = this.isMuted ? 0 : 0.4;
       }
       if (this.masterSfxGain) {
-        this.masterSfxGain.gain.setValueAtTime(this.isMuted ? 0 : 0.45, now);
+        this.masterSfxGain.gain.value = this.isMuted ? 0 : 0.7;
       }
     }
     return this.isMuted;
@@ -63,7 +86,7 @@ class SoundController {
     if (this.isPlayingMusic) return;
     this.isPlayingMusic = true;
     this.step = 0;
-    this.scheduleNextStep();
+    this.runMusicLoop();
   }
 
   stopMusic() {
@@ -74,15 +97,17 @@ class SoundController {
     }
   }
 
-  scheduleNextStep() {
+  runMusicLoop() {
     if (!this.isPlayingMusic || !this.ctx) return;
 
     const stepDuration = (60 / this.tempo) / 4; // 16th note in seconds
-    this.playStep(this.step, this.ctx.currentTime);
-    this.step = (this.step + 1) % 64; // 4-bar loop (64 sixteenth notes)
+    const now = this.ctx.currentTime;
+    
+    this.playStep(this.step, now);
+    this.step = (this.step + 1) % 64; // 64-step loop (4 bars of 16th notes)
 
     this.musicTimer = setTimeout(() => {
-      this.scheduleNextStep();
+      this.runMusicLoop();
     }, stepDuration * 1000);
   }
 
@@ -91,199 +116,207 @@ class SoundController {
 
     const stepDuration = (60 / this.tempo) / 4;
 
-    // Note frequencies
+    // Frequencies
     const C3 = 130.81, D3 = 146.83, E3 = 164.81, F3 = 174.61, G3 = 196.00, A3 = 220.00, B3 = 246.94;
     const C4 = 261.63, D4 = 293.66, E4 = 329.63, F4 = 349.23, G4 = 392.00, A4 = 440.00, B4 = 493.88;
-    const C5 = 523.25, D5 = 587.33, E5 = 659.25, F5 = 698.46, G5 = 783.99, A5 = 880.00, B5 = 987.77, C6 = 1046.50;
+    const C5 = 523.25, D5 = 587.33, E5 = 659.25, F5 = 698.46, G5 = 783.99, A5 = 880.00, B5 = 987.77;
+    const C6 = 1046.50, D6 = 1174.66, E6 = 1318.51;
 
-    // 1. LEAD SQUARE MELODY (Catchy, energetic chiptune hook)
+    // 1. LEAD SQUARE MELODY (Catchy, iconic arcade theme)
     const melodyPattern = [
-      // Bar 1 (C Major / G)
-      E5, 0, G5, 0, C6, 0, G5, 0,  E5, 0, D5, E5, G5, 0, E5, 0,
-      // Bar 2 (A Minor)
-      A5, 0, E5, 0, C6, 0, A5, 0,  B5, 0, A5, G5, E5, 0, D5, 0,
-      // Bar 3 (F Major -> G Major)
-      F5, 0, A5, 0, C6, 0, D6, 0,  B5, 0, G5, 0, E5, G5, B5, 0,
-      // Bar 4 (Turnaround hook)
-      C6, 0, G5, 0, E5, 0, D5, 0,  C5, D5, E5, G5, C6, 0, 0, 0
+      // Bar 1: C Major Hook
+      E5, 0, G5, 0, C6, 0, G5, 0,   E5, 0, D5, E5, G5, 0, E5, 0,
+      // Bar 2: A Minor Hook
+      A5, 0, E5, 0, C6, 0, A5, 0,   B5, 0, A5, G5, E5, 0, D5, 0,
+      // Bar 3: F Major -> G Major
+      F5, 0, A5, 0, C6, 0, D6, 0,   B5, 0, G5, 0,  E5, G5, B5, 0,
+      // Bar 4: Climax & Turnaround
+      C6, 0, G5, 0, E5, 0, D5, 0,   C5, D5, E5, G5, C6, 0, 0, 0
     ];
 
-    const leadNote = melodyPattern[step];
-    if (leadNote) {
-      this.playSquareNote(leadNote, time, stepDuration * 1.5, 0.22);
+    const leadFreq = melodyPattern[step];
+    if (leadFreq) {
+      this.playSquareLead(leadFreq, time, stepDuration * 1.6, 0.35);
     }
 
-    // 2. ARPEGGIO CHORD ENGINE (Classic NES 3-note fast sparkle)
+    // 2. RETRO ARPEGGIO CHORD ENGINE (Fast NES shimmer)
     const chords = [
-      [C4, E4, G4], // Bar 1 (0-15): C
-      [A3, C4, E4], // Bar 2 (16-31): Am
-      [F3, A3, C4], // Bar 3 (32-47): F
-      [G3, B3, D4]  // Bar 4 (48-63): G
+      [C4, E4, G4], // C
+      [A3, C4, E4], // Am
+      [F3, A3, C4], // F
+      [G3, B3, D4]  // G
     ];
     const currentChord = chords[Math.floor(step / 16)];
-    const arpNote = currentChord[step % 3];
-    if (arpNote) {
-      this.playArpNote(arpNote, time, stepDuration * 0.9, 0.10);
+    const arpFreq = currentChord[step % 3];
+    if (arpFreq) {
+      this.playArp(arpFreq, time, stepDuration * 0.9, 0.18);
     }
 
-    // 3. TRIANGLE BASSLINE (Bouncy, driving bass)
+    // 3. BOUNCY BASSLINE (Square / Triangle blend)
     const bassPattern = [
-      // Bar 1
-      C3, 0, G3, 0, C3, 0, G3, 0,  C3, 0, E3, 0, G3, 0, G3, 0,
-      // Bar 2
-      A3, 0, E3, 0, A3, 0, E3, 0,  A3, 0, C4, 0, E3, 0, G3, 0,
-      // Bar 3
-      F3, 0, C4, 0, F3, 0, C4, 0,  G3, 0, D4, 0, G3, 0, B3, 0,
-      // Bar 4
-      C3, 0, G3, 0, C3, 0, G3, 0,  G3, 0, G3, 0, C3, 0, 0, 0
+      // Bar 1 (C)
+      C3, 0, G3, 0, C3, 0, G3, 0,   C3, 0, E3, 0, G3, 0, G3, 0,
+      // Bar 2 (Am)
+      A3, 0, E3, 0, A3, 0, E3, 0,   A3, 0, C4, 0, E3, 0, G3, 0,
+      // Bar 3 (F -> G)
+      F3, 0, C4, 0, F3, 0, C4, 0,   G3, 0, D4, 0, G3, 0, B3, 0,
+      // Bar 4 (C Turnaround)
+      C3, 0, G3, 0, C3, 0, G3, 0,   G3, 0, G3, 0, C3, 0, 0, 0
     ];
-    const bassNote = bassPattern[step];
-    if (bassNote) {
-      this.playTriangleBass(bassNote, time, stepDuration * 1.8, 0.35);
+    const bassFreq = bassPattern[step];
+    if (bassFreq) {
+      this.playBass(bassFreq, time, stepDuration * 1.7, 0.5);
     }
 
-    // 4. NOISE DRUMS (8-bit kick, snare & hi-hat)
+    // 4. RETRO DRUMS
     if (step % 8 === 0) {
-      // 8-bit Kick on beat 1 & 3
-      this.play8BitKick(time);
+      this.playKick(time);
     } else if (step % 8 === 4) {
-      // 8-bit Snare on beat 2 & 4
-      this.play8BitSnare(time);
+      this.playSnare(time);
     } else if (step % 2 === 0) {
-      // Hi-hat tick
-      this.play8BitHat(time);
+      this.playHat(time);
     }
   }
 
-  playSquareNote(freq, time, duration, volume) {
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
+  playSquareLead(freq, time, duration, volume) {
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
 
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(freq, time);
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(freq, time);
 
-    gain.gain.setValueAtTime(volume, time);
-    gain.gain.setValueAtTime(volume * 0.8, time + duration * 0.4);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+      gain.gain.setValueAtTime(volume, time);
+      gain.gain.exponentialRampToValueAtTime(volume * 0.7, time + duration * 0.5);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
 
-    osc.connect(gain);
-    gain.connect(this.masterMusicGain);
+      osc.connect(gain);
+      gain.connect(this.masterMusicGain);
 
-    osc.start(time);
-    osc.stop(time + duration);
+      osc.start(time);
+      osc.stop(time + duration);
+    } catch (e) {}
   }
 
-  playArpNote(freq, time, duration, volume) {
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
+  playArp(freq, time, duration, volume) {
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
 
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(freq * 2, time); // higher octave shimmer
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(freq * 2, time);
 
-    // Highpass filter for bright crisp chiptune sparkle
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'highpass';
-    filter.frequency.setValueAtTime(1000, time);
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.setValueAtTime(800, time);
 
-    gain.gain.setValueAtTime(volume, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+      gain.gain.setValueAtTime(volume, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
 
-    osc.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.masterMusicGain);
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.masterMusicGain);
 
-    osc.start(time);
-    osc.stop(time + duration);
+      osc.start(time);
+      osc.stop(time + duration);
+    } catch (e) {}
   }
 
-  playTriangleBass(freq, time, duration, volume) {
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
+  playBass(freq, time, duration, volume) {
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
 
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(freq, time);
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, time);
 
-    gain.gain.setValueAtTime(volume, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+      gain.gain.setValueAtTime(volume, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
 
-    osc.connect(gain);
-    gain.connect(this.masterMusicGain);
+      osc.connect(gain);
+      gain.connect(this.masterMusicGain);
 
-    osc.start(time);
-    osc.stop(time + duration);
+      osc.start(time);
+      osc.stop(time + duration);
+    } catch (e) {}
   }
 
-  play8BitKick(time) {
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
+  playKick(time) {
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
 
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(150, time);
-    osc.frequency.exponentialRampToValueAtTime(30, time + 0.08);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(160, time);
+      osc.frequency.exponentialRampToValueAtTime(35, time + 0.09);
 
-    gain.gain.setValueAtTime(0.3, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
+      gain.gain.setValueAtTime(0.6, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.09);
 
-    osc.connect(gain);
-    gain.connect(this.masterMusicGain);
+      osc.connect(gain);
+      gain.connect(this.masterMusicGain);
 
-    osc.start(time);
-    osc.stop(time + 0.08);
+      osc.start(time);
+      osc.stop(time + 0.09);
+    } catch (e) {}
   }
 
-  play8BitSnare(time) {
-    // Noise buffer for snappy 8-bit snare
-    const bufferSize = this.ctx.sampleRate * 0.1;
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * 0.7;
-    }
+  playSnare(time) {
+    try {
+      const bufferSize = Math.floor(this.ctx.sampleRate * 0.1);
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * 0.8;
+      }
 
-    const noise = this.ctx.createBufferSource();
-    noise.buffer = buffer;
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buffer;
 
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(1200, time);
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1400, time);
 
-    const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.22, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.4, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
 
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.masterMusicGain);
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.masterMusicGain);
 
-    noise.start(time);
-    noise.stop(time + 0.1);
+      noise.start(time);
+      noise.stop(time + 0.1);
+    } catch (e) {}
   }
 
-  play8BitHat(time) {
-    const bufferSize = this.ctx.sampleRate * 0.03;
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
+  playHat(time) {
+    try {
+      const bufferSize = Math.floor(this.ctx.sampleRate * 0.03);
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
 
-    const noise = this.ctx.createBufferSource();
-    noise.buffer = buffer;
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buffer;
 
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'highpass';
-    filter.frequency.setValueAtTime(7000, time);
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.setValueAtTime(6000, time);
 
-    const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.08, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.03);
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.15, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.03);
 
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.masterMusicGain);
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.masterMusicGain);
 
-    noise.start(time);
-    noise.stop(time + 0.03);
+      noise.start(time);
+      noise.stop(time + 0.03);
+    } catch (e) {}
   }
 
   // --- SOUND EFFECTS ---
@@ -293,40 +326,41 @@ class SoundController {
     if (this.isMuted || !this.ctx) return;
     this.resume();
 
-    const now = this.ctx.currentTime;
-    
-    // Low frequency oscillator for the comical fart flutter
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    
-    const modOsc = this.ctx.createOscillator();
-    const modGain = this.ctx.createGain();
+    try {
+      const now = this.ctx.currentTime;
+      
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      
+      const modOsc = this.ctx.createOscillator();
+      const modGain = this.ctx.createGain();
 
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(140 + Math.random() * 30, now);
-    osc.frequency.exponentialRampToValueAtTime(70, now + 0.12);
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(140 + Math.random() * 30, now);
+      osc.frequency.exponentialRampToValueAtTime(70, now + 0.12);
 
-    modOsc.type = 'square';
-    modOsc.frequency.setValueAtTime(45 + Math.random() * 15, now);
-    modGain.gain.setValueAtTime(40, now);
+      modOsc.type = 'square';
+      modOsc.frequency.setValueAtTime(45 + Math.random() * 15, now);
+      modGain.gain.setValueAtTime(40, now);
 
-    modOsc.connect(osc.frequency);
+      modOsc.connect(osc.frequency);
 
-    gain.gain.setValueAtTime(0.4, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+      gain.gain.setValueAtTime(0.6, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
 
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(600, now);
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(600, now);
 
-    osc.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.masterSfxGain);
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.masterSfxGain);
 
-    modOsc.start(now);
-    osc.start(now);
-    modOsc.stop(now + 0.12);
-    osc.stop(now + 0.12);
+      modOsc.start(now);
+      osc.start(now);
+      modOsc.stop(now + 0.12);
+      osc.stop(now + 0.12);
+    } catch (e) {}
   }
 
   // Golden chime / point score sound
@@ -334,25 +368,27 @@ class SoundController {
     if (this.isMuted || !this.ctx) return;
     this.resume();
 
-    const now = this.ctx.currentTime;
-    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6 (major arpeggio)
-    
-    notes.forEach((freq, idx) => {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
+    try {
+      const now = this.ctx.currentTime;
+      const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6 (major arpeggio)
+      
+      notes.forEach((freq, idx) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
 
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, now + idx * 0.035);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.035);
 
-      gain.gain.setValueAtTime(0.3, now + idx * 0.035);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.035 + 0.22);
+        gain.gain.setValueAtTime(0.4, now + idx * 0.035);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.035 + 0.22);
 
-      osc.connect(gain);
-      gain.connect(this.masterSfxGain);
+        osc.connect(gain);
+        gain.connect(this.masterSfxGain);
 
-      osc.start(now + idx * 0.035);
-      osc.stop(now + idx * 0.035 + 0.22);
-    });
+        osc.start(now + idx * 0.035);
+        osc.stop(now + idx * 0.035 + 0.22);
+      });
+    } catch (e) {}
   }
 
   // Splat collision sound
@@ -360,34 +396,36 @@ class SoundController {
     if (this.isMuted || !this.ctx) return;
     this.resume();
 
-    const now = this.ctx.currentTime;
-    
-    const bufferSize = this.ctx.sampleRate * 0.2;
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const output = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      output[i] = Math.random() * 2 - 1;
-    }
+    try {
+      const now = this.ctx.currentTime;
+      
+      const bufferSize = Math.floor(this.ctx.sampleRate * 0.2);
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const output = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
 
-    const whiteNoise = this.ctx.createBufferSource();
-    whiteNoise.buffer = buffer;
+      const whiteNoise = this.ctx.createBufferSource();
+      whiteNoise.buffer = buffer;
 
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(400, now);
-    filter.frequency.exponentialRampToValueAtTime(80, now + 0.2);
-    filter.Q.setValueAtTime(3, now);
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(400, now);
+      filter.frequency.exponentialRampToValueAtTime(80, now + 0.2);
+      filter.Q.setValueAtTime(3, now);
 
-    const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.6, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.8, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
 
-    whiteNoise.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.masterSfxGain);
+      whiteNoise.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.masterSfxGain);
 
-    whiteNoise.start(now);
-    whiteNoise.stop(now + 0.2);
+      whiteNoise.start(now);
+      whiteNoise.stop(now + 0.2);
+    } catch (e) {}
   }
 
   // Toilet flush death sound
@@ -395,47 +433,49 @@ class SoundController {
     if (this.isMuted || !this.ctx) return;
     this.resume();
 
-    const now = this.ctx.currentTime;
-    
-    const bufferSize = this.ctx.sampleRate * 0.8;
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
+    try {
+      const now = this.ctx.currentTime;
+      
+      const bufferSize = Math.floor(this.ctx.sampleRate * 0.8);
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
 
-    const noise = this.ctx.createBufferSource();
-    noise.buffer = buffer;
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buffer;
 
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(1000, now);
-    filter.frequency.linearRampToValueAtTime(200, now + 0.8);
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1000, now);
+      filter.frequency.linearRampToValueAtTime(200, now + 0.8);
 
-    const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.5, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.6, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
 
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.masterSfxGain);
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.masterSfxGain);
 
-    const osc = this.ctx.createOscillator();
-    const oscGain = this.ctx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(300, now);
-    osc.frequency.exponentialRampToValueAtTime(40, now + 0.7);
+      const osc = this.ctx.createOscillator();
+      const oscGain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(300, now);
+      osc.frequency.exponentialRampToValueAtTime(40, now + 0.7);
 
-    oscGain.gain.setValueAtTime(0.3, now);
-    oscGain.gain.exponentialRampToValueAtTime(0.01, now + 0.7);
+      oscGain.gain.setValueAtTime(0.4, now);
+      oscGain.gain.exponentialRampToValueAtTime(0.01, now + 0.7);
 
-    osc.connect(oscGain);
-    oscGain.connect(this.masterSfxGain);
+      osc.connect(oscGain);
+      oscGain.connect(this.masterSfxGain);
 
-    noise.start(now);
-    osc.start(now);
-    noise.stop(now + 0.8);
-    osc.stop(now + 0.7);
+      noise.start(now);
+      osc.start(now);
+      noise.stop(now + 0.8);
+      osc.stop(now + 0.7);
+    } catch (e) {}
   }
 
   // Milestone Fanfare
@@ -443,23 +483,25 @@ class SoundController {
     if (this.isMuted || !this.ctx) return;
     this.resume();
 
-    const now = this.ctx.currentTime;
-    const chord = [587.33, 739.99, 880.00, 1174.66]; // D, F#, A, D
-    chord.forEach((freq) => {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, now);
+    try {
+      const now = this.ctx.currentTime;
+      const chord = [587.33, 739.99, 880.00, 1174.66]; // D, F#, A, D
+      chord.forEach((freq) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now);
 
-      gain.gain.setValueAtTime(0.2, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
 
-      osc.connect(gain);
-      gain.connect(this.masterSfxGain);
+        osc.connect(gain);
+        gain.connect(this.masterSfxGain);
 
-      osc.start(now);
-      osc.stop(now + 0.5);
-    });
+        osc.start(now);
+        osc.stop(now + 0.5);
+      });
+    } catch (e) {}
   }
 }
 

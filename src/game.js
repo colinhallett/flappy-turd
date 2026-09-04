@@ -455,7 +455,17 @@
     startGame();
   });
 
+  btnStart.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    startGame();
+  });
+
   btnStart.addEventListener('click', (e) => {
+    e.stopPropagation();
+    startGame();
+  });
+
+  btnRestart.addEventListener('pointerdown', (e) => {
     e.stopPropagation();
     startGame();
   });
