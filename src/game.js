@@ -262,6 +262,8 @@
 
   function startGame() {
     window.soundCtrl.init();
+    window.soundCtrl.resume();
+    window.soundCtrl.startMusic();
     currentState = STATES.PLAYING;
     score = 0;
     frameCount = 0;
@@ -278,6 +280,7 @@
 
   function gameOver() {
     currentState = STATES.GAMEOVER;
+    window.soundCtrl.stopMusic();
     window.soundCtrl.playHit();
     window.soundCtrl.playFlush();
     spawnDeathSplats(turd.x, turd.y);
